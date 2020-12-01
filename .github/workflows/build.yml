@@ -1,4 +1,4 @@
-name: Android CD
+name: iOS & Android CD
 
 on:
   push:
@@ -8,7 +8,8 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    # iOSビルド用にmacOSを使う(消費ビルド時間に注意)
+    runs-on: macos-latest
 
     steps:
       - uses: actions/checkout@v2
@@ -16,6 +17,19 @@ jobs:
         uses: actions/setup-java@v1
         with:
           java-version: '8.x'
+
+      # ProvisioningProfile をシークレットから取り出して、プロジェクトに無理やりセットする
+      - name: Import Provisioning Profile
+        run: |
+          mkdir -p ~/Library/MobileDevice/Provisioning\ Profiles
+          echo '${{ secrets.PROVISIONING_PROFILE }}' | openssl base64 -d -out ~/Library/MobileDevice/Provisioning\ Profiles/flutter_app_store.mobileprovision
+
+      # 証明書を設定
+      - name: Import Code-Signing Certificates
+        uses: Apple-Actions/import-codesign-certs@v1
+        with:
+          p12-file-base64: ${{ secrets.CERTIFICATES_P12 }}
+          p12-password: ${{ secrets.CERTIFICATES_P12_PASSWORD }}
 
       - name: setup cache
         uses: actions/cache@v1
@@ -32,19 +46,41 @@ jobs:
       - name: flutter dependencies install
         run: flutter pub get
 
-      - name: build apk
+#      - name: build apk
+#        run: |
+#          echo '${{ secrets.KEYSTORE_BASE64 }}' | base64 -d > android/release.keystore
+#          export KEYSTORE_PASSWORD='${{ secrets.KEYSTORE_PASSWORD }}'
+#          export KEY_ALIAS='${{ secrets.KEY_ALIAS }}'
+#          export KEY_PASSWORD='${{ secrets.KEY_PASSWORD }}'
+#          flutter build apk --release
+
+      - name: build ipa
         run: |
-          echo '${{ secrets.KEYSTORE_BASE64 }}' | base64 -d > android/release.keystore
-          export KEYSTORE_PASSWORD='${{ secrets.KEYSTORE_PASSWORD }}'
-          export KEY_ALIAS='${{ secrets.KEY_ALIAS }}'
-          export KEY_PASSWORD='${{ secrets.KEY_PASSWORD }}'
-          flutter build apk --release
+          flutter build ios --release --no-codesign
+
+      - name: iOS Build Action
+        uses: yukiarrr/ios-build-action@v0.5.0
+        with:
+          project-path: ios/Runner.xcodeproj
+          p12-base64: ${{ secrets.CERTIFICATES_P12 }}
+          mobileprovision-base64: ${{ secrets.PROVISIONING_PROFILE }}
+          code-signing-identity: Apple Distribution
+          team-id: ${{ secrets.TEAM_ID }}
+          workspace-path: ios/Runner.xcworkspace
+          certificate-password: ${{ secrets.CERTIFICATES_P12_PASSWORD }}
+          output-path: app-release.ipa
 
       - name: Upload artifact
         uses: actions/upload-artifact@v1.0.0
         with:
-          name: android
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: ios
+          path: app-release.ipa
+
+#      - name: Upload artifact
+#        uses: actions/upload-artifact@v1.0.0
+#        with:
+#          name: android
+#          path: build/app/outputs/flutter-apk/app-release.apk
 
   deploy:
     needs: [build]
@@ -52,15 +88,31 @@ jobs:
     steps:
 
       - uses: actions/checkout@v2
+
+      # モジュールのダウンロード
       - name: Download artifact
         uses: actions/download-artifact@v1.0.0
         with:
-          name: android
+          name: ios
 
+#      - name: Download artifact
+#        uses: actions/download-artifact@v1.0.0
+#        with:
+#          name: android
+
+      # Firebase にデプロイ
       - name: Firebase App Distribution
         uses: wzieba/Firebase-Distribution-Github-Action@v1.2.1
         with:
-          appId: ${{secrets.FIREBASE_APP_ID_ANDROID}}
+          appId: ${{secrets.FIREBASE_APP_ID_IOS}}
           token: ${{secrets.FIREBASE_TOKEN}}
           groups: testers
-          file: android/app-release.apk
+          file: ios/app-release.ipa
+
+#      - name: Firebase App Distribution
+#        uses: wzieba/Firebase-Distribution-Github-Action@v1.2.1
+#        with:
+#          appId: ${{secrets.FIREBASE_APP_ID_ANDROID}}
+#          token: ${{secrets.FIREBASE_TOKEN}}
+#          groups: testers
+#          file: android/app-release.apk
