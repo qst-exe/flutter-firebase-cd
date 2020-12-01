@@ -46,13 +46,13 @@ jobs:
       - name: flutter dependencies install
         run: flutter pub get
 
-#      - name: build apk
-#        run: |
-#          echo '${{ secrets.KEYSTORE_BASE64 }}' | base64 -d > android/release.keystore
-#          export KEYSTORE_PASSWORD='${{ secrets.KEYSTORE_PASSWORD }}'
-#          export KEY_ALIAS='${{ secrets.KEY_ALIAS }}'
-#          export KEY_PASSWORD='${{ secrets.KEY_PASSWORD }}'
-#          flutter build apk --release
+      - name: build apk
+        run: |
+          echo '${{ secrets.KEYSTORE_BASE64 }}' | base64 -d > android/release.keystore
+          export KEYSTORE_PASSWORD='${{ secrets.KEYSTORE_PASSWORD }}'
+          export KEY_ALIAS='${{ secrets.KEY_ALIAS }}'
+          export KEY_PASSWORD='${{ secrets.KEY_PASSWORD }}'
+          flutter build apk --release
 
       - name: build ipa
         run: |
@@ -76,11 +76,11 @@ jobs:
           name: ios
           path: app-release.ipa
 
-#      - name: Upload artifact
-#        uses: actions/upload-artifact@v1.0.0
-#        with:
-#          name: android
-#          path: build/app/outputs/flutter-apk/app-release.apk
+      - name: Upload artifact
+        uses: actions/upload-artifact@v1.0.0
+        with:
+          name: android
+          path: build/app/outputs/flutter-apk/app-release.apk
 
   deploy:
     needs: [build]
@@ -95,10 +95,10 @@ jobs:
         with:
           name: ios
 
-#      - name: Download artifact
-#        uses: actions/download-artifact@v1.0.0
-#        with:
-#          name: android
+      - name: Download artifact
+        uses: actions/download-artifact@v1.0.0
+        with:
+          name: android
 
       # Firebase にデプロイ
       - name: Firebase App Distribution
@@ -109,10 +109,10 @@ jobs:
           groups: testers
           file: ios/app-release.ipa
 
-#      - name: Firebase App Distribution
-#        uses: wzieba/Firebase-Distribution-Github-Action@v1.2.1
-#        with:
-#          appId: ${{secrets.FIREBASE_APP_ID_ANDROID}}
-#          token: ${{secrets.FIREBASE_TOKEN}}
-#          groups: testers
-#          file: android/app-release.apk
+      - name: Firebase App Distribution
+        uses: wzieba/Firebase-Distribution-Github-Action@v1.2.1
+        with:
+          appId: ${{secrets.FIREBASE_APP_ID_ANDROID}}
+          token: ${{secrets.FIREBASE_TOKEN}}
+          groups: testers
+          file: android/app-release.apk
