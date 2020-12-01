@@ -1,0 +1,44 @@
+name: Android CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: install java 8.x
+        uses: actions/setup-java@v1
+        with:
+          java-version: '8.x'
+
+      - name: setup cache
+        uses: actions/cache@v1
+        with:
+          path: /Users/runner/hostedtoolcache/flutter
+          key: ${{ runner.OS }}-flutter-install-cache
+
+      - name: install flutter
+        uses: subosito/flutter-action@v1
+        with:
+          flutter-version: '1.24.0-10.2.pre'
+          channel: 'beta'
+
+      - name: flutter dependencies install
+        run: flutter pub get
+
+      - name: build apk
+#        run: flutter build apk --debug --flavor dev
+        run: flutter build apk --debug
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v1.0.0
+        with:
+          name: android
+          path: build/app/outputs/flutter-apk/app-debug.apk
