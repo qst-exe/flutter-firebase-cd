@@ -1,4 +1,4 @@
-name: iOS & Android CD
+name: iOS CD
 
 on:
   push:
@@ -13,10 +13,6 @@ jobs:
 
     steps:
       - uses: actions/checkout@v2
-      - name: install java 8.x
-        uses: actions/setup-java@v1
-        with:
-          java-version: '8.x'
 
       # ProvisioningProfile をシークレットから取り出して、プロジェクトに無理やりセットする
       - name: Import Provisioning Profile
@@ -31,12 +27,6 @@ jobs:
           p12-file-base64: ${{ secrets.CERTIFICATES_P12 }}
           p12-password: ${{ secrets.CERTIFICATES_P12_PASSWORD }}
 
-      - name: setup cache
-        uses: actions/cache@v1
-        with:
-          path: /Users/runner/hostedtoolcache/flutter
-          key: ${{ runner.OS }}-flutter-install-cache
-
       - name: install flutter
         uses: subosito/flutter-action@v1
         with:
@@ -46,17 +36,8 @@ jobs:
       - name: flutter dependencies install
         run: flutter pub get
 
-      - name: build apk
-        run: |
-          echo '${{ secrets.KEYSTORE_BASE64 }}' | base64 -d > android/release.keystore
-          export KEYSTORE_PASSWORD='${{ secrets.KEYSTORE_PASSWORD }}'
-          export KEY_ALIAS='${{ secrets.KEY_ALIAS }}'
-          export KEY_PASSWORD='${{ secrets.KEY_PASSWORD }}'
-          flutter build apk --release
-
       - name: build ipa
-        run: |
-          flutter build ios --release --no-codesign
+        run: flutter build ios --release --no-codesign
 
       - name: iOS Build Action
         uses: yukiarrr/ios-build-action@v0.5.0
@@ -76,17 +57,10 @@ jobs:
           name: ios
           path: app-release.ipa
 
-      - name: Upload artifact
-        uses: actions/upload-artifact@v1.0.0
-        with:
-          name: android
-          path: build/app/outputs/flutter-apk/app-release.apk
-
   deploy:
     needs: [build]
     runs-on: ubuntu-latest
     steps:
-
       - uses: actions/checkout@v2
 
       # モジュールのダウンロード
@@ -94,11 +68,6 @@ jobs:
         uses: actions/download-artifact@v1.0.0
         with:
           name: ios
-
-      - name: Download artifact
-        uses: actions/download-artifact@v1.0.0
-        with:
-          name: android
 
       # Firebase にデプロイ
       - name: Firebase App Distribution
@@ -108,11 +77,3 @@ jobs:
           token: ${{secrets.FIREBASE_TOKEN}}
           groups: testers
           file: ios/app-release.ipa
-
-      - name: Firebase App Distribution
-        uses: wzieba/Firebase-Distribution-Github-Action@v1.2.1
-        with:
-          appId: ${{secrets.FIREBASE_APP_ID_ANDROID}}
-          token: ${{secrets.FIREBASE_TOKEN}}
-          groups: testers
-          file: android/app-release.apk

@@ -1,0 +1,69 @@
+name: Android CD
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v2
+      - name: install java 8.x
+        uses: actions/setup-java@v1
+        with:
+          java-version: '8.x'
+
+      - name: setup cache
+        uses: actions/cache@v1
+        with:
+          path: /Users/runner/hostedtoolcache/flutter
+          key: ${{ runner.OS }}-flutter-install-cache
+
+      - name: install flutter
+        uses: subosito/flutter-action@v1
+        with:
+          flutter-version: '1.24.0-10.2.pre'
+          channel: 'beta'
+
+      - name: flutter dependencies install
+        run: flutter pub get
+
+      - name: build apk
+        run: |
+          echo '${{ secrets.KEYSTORE_BASE64 }}' | base64 -d > android/release.keystore
+          export KEYSTORE_PASSWORD='${{ secrets.KEYSTORE_PASSWORD }}'
+          export KEY_ALIAS='${{ secrets.KEY_ALIAS }}'
+          export KEY_PASSWORD='${{ secrets.KEY_PASSWORD }}'
+          flutter build apk --release
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v1.0.0
+        with:
+          name: android
+          path: build/app/outputs/flutter-apk/app-release.apk
+
+  deploy:
+    needs: [build]
+    runs-on: ubuntu-latest
+    steps:
+
+      - uses: actions/checkout@v2
+
+      # モジュールのダウンロード
+      - name: Download artifact
+        uses: actions/download-artifact@v1.0.0
+        with:
+          name: android
+
+      # Firebase にデプロイ
+      - name: Firebase App Distribution
+        uses: wzieba/Firebase-Distribution-Github-Action@v1.2.1
+        with:
+          appId: ${{secrets.FIREBASE_APP_ID_ANDROID}}
+          token: ${{secrets.FIREBASE_TOKEN}}
+          groups: testers
+          file: android/app-release.apk
